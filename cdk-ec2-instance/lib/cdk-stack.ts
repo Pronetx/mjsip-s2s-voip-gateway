@@ -48,29 +48,39 @@ export class VoipGatewayEC2Stack extends cdk.Stack {
     // Create a security group for the EC2 instance
     const securityGroup = new ec2.SecurityGroup(this, 'VoipGatewaySG', {
       vpc,
-      description: 'Allow SSH, SIP, and RTP traffic',
+      description: 'Allow SSH, SIP, and RTP traffic from Chime Voice Connector',
       allowAllOutbound: true,
     });
 
-    // Allow SIP traffic on port 5060
+    // Chime Voice Connector IP space for us-west-2
+    const chimeVoiceConnectorCidr = '99.77.253.0/24';
+
+    // Allow SIP UDP traffic on port 5060 from Chime Voice Connector
     securityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(),
+      ec2.Peer.ipv4(chimeVoiceConnectorCidr),
       ec2.Port.udp(5060),
-      'Allow SIP traffic on port 5060'
+      'Allow SIP UDP traffic from Chime Voice Connector'
     );
 
-    // Allow RTP traffic on ports 10000-20000
+    // Allow SIP TCP traffic on port 5060 from Chime Voice Connector
     securityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(),
-      ec2.Port.udpRange(10000, 20000),
-      'Allow RTP traffic on ports 10000-20000'
+      ec2.Peer.ipv4(chimeVoiceConnectorCidr),
+      ec2.Port.tcp(5060),
+      'Allow SIP TCP traffic from Chime Voice Connector'
     );
 
-    // Allow SSH traffic for management
+    // Allow RTP traffic on ports 10000-20000 from Chime Voice Connector
+    securityGroup.addIngressRule(
+      ec2.Peer.ipv4(chimeVoiceConnectorCidr),
+      ec2.Port.udpRange(10000, 20000),
+      'Allow RTP traffic from Chime Voice Connector'
+    );
+
+    // Allow SSH traffic for management (consider restricting to your IP)
     securityGroup.addIngressRule(
       ec2.Peer.anyIpv4(),
       ec2.Port.tcp(22),
-      'Allow SSH traffic'
+      'Allow SSH traffic for management'
     );
 
     // Create an EC2 instance in a public subnet

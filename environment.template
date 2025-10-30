@@ -1,6 +1,11 @@
+# SIP Configuration
 SIP_SERVER=
 SIP_USER=
 AUTH_USER=
 AUTH_PASSWORD=
 AUTH_REALM=
 DISPLAY_NAME=
+
+# Trunk Mode: Set to false to disable registration (inbound calls only)
+# Set to true to register with the SIP server
+DO_REGISTER=false

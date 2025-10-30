@@ -1,0 +1,17 @@
+[Unit]
+Description=Nova S2S VoIP Gateway
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/mjsip-s2s-voip-gateway
+ExecStart=/usr/bin/java -jar /home/ec2-user/mjsip-s2s-voip-gateway/s2s-voip-gateway-0.6-SNAPSHOT.jar
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nova-voip-gateway
+
+[Install]
+WantedBy=multi-user.target

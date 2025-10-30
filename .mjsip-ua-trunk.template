@@ -1,0 +1,47 @@
+#######################################################################################
+# Configuration for the mjsip user agent in TRUNK MODE (inbound calls only)
+#
+# This configuration disables registration with a SIP server and listens for
+# inbound calls only. Use this when connecting to a SIP trunk/PBX that will
+# route calls to this gateway's IP address directly.
+#
+# To use: Copy this file to .mjsip-ua and fill in the values below
+#######################################################################################
+
+# Display name for the user
+display-name=Nova Gateway
+
+# User's name - used in From header
+sip-user=<your_extension_or_trunk_identifier>
+
+# SIP server (used for authentication, even in trunk mode)
+registrar=<sip_server_ip_or_hostname>
+
+# Authentication credentials (required if your trunk requires auth)
+auth_user=<sip_username>
+auth_realm=<sip_realm>
+auth_passwd=<sip_password>
+
+# TRUNK MODE SETTINGS
+# Disable registration - gateway will only accept inbound calls
+do_register=no
+
+# Via address - MUST be set to your EC2 instance's Elastic IP
+# This tells the SIP server how to reach this gateway
+via-addr=35.155.30.129
+
+# SIP listening port
+host-port=5060
+
+# RTP media port range (must match security group rules)
+media-port=10000
+port-count=10000
+
+# Non-interactive mode (required for running as service)
+no-prompt=yes
+
+# Debug SIP traffic
+log-all-packets=yes
+
+# Media configuration
+media=audio 4000 RTP/AVP { 0 PCMU 8000 160 }

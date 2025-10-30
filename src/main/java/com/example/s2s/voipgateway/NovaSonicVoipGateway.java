@@ -21,7 +21,12 @@ import org.mjsip.ua.streamer.StreamerFactory;
 import org.slf4j.LoggerFactory;
 import org.zoolu.net.SocketAddress;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 
 /**
@@ -35,6 +40,7 @@ public class NovaSonicVoipGateway extends RegisteringMultipleUAS {
     private StreamerFactory streamerFactory;
     private RegistrationClient _rc;
     private SipKeepAlive keep_alive;
+    private Set<String> acceptedNumbers;
 
     // *************************** Public methods **************************
 
@@ -47,6 +53,8 @@ public class NovaSonicVoipGateway extends RegisteringMultipleUAS {
         this.mediaConfig = mediaConfig;
         this.uaConfig = uaConfig;
         streamerFactory = new NovaStreamerFactory(this.mediaConfig);
+        this.acceptedNumbers = loadAcceptedNumbers();
+        LOG.info("Loaded {} accepted numbers", acceptedNumbers.size());
         registerWithKeepAlive();
     }
 
@@ -105,10 +113,118 @@ public class NovaSonicVoipGateway extends RegisteringMultipleUAS {
             @Override
             public void onUaIncomingCall(UserAgent ua, NameAddress callee, NameAddress caller,
                                          MediaDesc[] media_descs) {
-                LOG.info("Incomming call from: {}", callee.getAddress());
-                ua.accept(new MediaAgent(mediaConfig.getMediaDescs(), streamerFactory));
+                LOG.info("Incoming call from: {} to: {}", caller.getAddress(), callee.getAddress());
+
+                // Extract the called number (To address)
+                String calledNumber = extractPhoneNumber(callee.getAddress().toString());
+
+                // Check if the call is for our accepted number (4432304260, 14432304260, or +14432304260)
+                if (isAcceptedNumber(calledNumber)) {
+                    LOG.info("Accepting call to: {}", calledNumber);
+                    ua.accept(new MediaAgent(mediaConfig.getMediaDescs(), streamerFactory));
+                } else {
+                    LOG.warn("Rejecting call to unaccepted number: {}", calledNumber);
+                    ua.hangup();
+                }
             }
         };
+    }
+
+    /**
+     * Extract phone number from SIP URI
+     * @param sipUri The SIP URI (e.g., sip:+14432304260@example.com)
+     * @return The phone number portion
+     */
+    private String extractPhoneNumber(String sipUri) {
+        if (sipUri == null) return "";
+
+        // Extract the user part from sip:user@domain
+        String userPart = sipUri;
+        if (userPart.contains("sip:")) {
+            userPart = userPart.substring(userPart.indexOf("sip:") + 4);
+        }
+        if (userPart.contains("@")) {
+            userPart = userPart.substring(0, userPart.indexOf("@"));
+        }
+
+        // Remove any non-digit characters except + at the start
+        if (userPart.startsWith("+")) {
+            return "+" + userPart.substring(1).replaceAll("[^0-9]", "");
+        } else {
+            return userPart.replaceAll("[^0-9]", "");
+        }
+    }
+
+    /**
+     * Load accepted numbers from configuration file
+     */
+    private Set<String> loadAcceptedNumbers() {
+        Set<String> numbers = new HashSet<>();
+        try {
+            InputStream is = getClass().getClassLoader().getResourceAsStream("accepted-numbers.properties");
+            if (is == null) {
+                LOG.warn("accepted-numbers.properties not found, accepting all calls");
+                return numbers;
+            }
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                // Skip comments and empty lines
+                if (line.isEmpty() || line.startsWith("#")) {
+                    continue;
+                }
+                // Normalize the number (remove all non-digits)
+                String normalized = line.replaceAll("[^0-9]", "");
+                if (!normalized.isEmpty()) {
+                    numbers.add(normalized);
+                    LOG.info("Added accepted number: {}", normalized);
+                }
+            }
+            reader.close();
+        } catch (Exception e) {
+            LOG.error("Error loading accepted numbers: {}", e.getMessage(), e);
+        }
+        return numbers;
+    }
+
+    /**
+     * Check if the called number matches any accepted number
+     * Handles variations: 4432304260, 14432304260, +14432304260
+     */
+    private boolean isAcceptedNumber(String number) {
+        if (number == null || number.isEmpty()) {
+            return acceptedNumbers.isEmpty(); // Accept all if no filter configured
+        }
+
+        // If no numbers configured, accept all
+        if (acceptedNumbers.isEmpty()) {
+            return true;
+        }
+
+        // Normalize to compare (remove all non-digits)
+        String normalized = number.replaceAll("[^0-9]", "");
+
+        // Check exact match
+        if (acceptedNumbers.contains(normalized)) {
+            return true;
+        }
+
+        // Check with country code (1 prefix)
+        if (normalized.startsWith("1") && normalized.length() == 11) {
+            // Try without the 1 prefix
+            if (acceptedNumbers.contains(normalized.substring(1))) {
+                return true;
+            }
+        } else if (normalized.length() == 10) {
+            // Try with 1 prefix
+            if (acceptedNumbers.contains("1" + normalized)) {
+                return true;
+            }
+        }
+
+        return false;
     }
     /**
      * The main method.
@@ -158,6 +274,8 @@ public class NovaSonicVoipGateway extends RegisteringMultipleUAS {
         uaConfig.setAuthPasswd(environ.get("AUTH_PASSWORD"));
         uaConfig.setAuthRealm(environ.get("AUTH_REALM"));
         uaConfig.setDisplayName(environ.get("DISPLAY_NAME"));
+        // Support trunk mode (inbound-only, no registration)
+        uaConfig.setRegister(environ.getOrDefault("DO_REGISTER","true").equalsIgnoreCase("true"));
         if (isConfigured(environ.get("MEDIA_ADDRESS"))) {
             uaConfig.setMediaAddr(environ.get("MEDIA_ADDRESS"));
         }

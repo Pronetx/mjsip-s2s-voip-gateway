@@ -18,6 +18,6 @@ new VoipGatewayEC2Stack(app, 'VoipGatewayEC2Stack', {
 
   /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
 
-  keyPairName: 'my-key-pair',
+  keyPairName: 'mjsip_s2s_gateway',
   // vpcId: 'vpc-########',
 });

@@ -115,6 +115,35 @@ From a terminal run the following:
 
 This project utilizes a fork of the mjSIP project, which can be found at https://github.com/haumacher/mjSIP, which is licensed under GPLv2.
 
+## Phone Number Filtering
+
+The gateway can filter incoming calls to only accept calls destined to specific phone numbers. This is configured via a properties file that can be easily modified without code changes.
+
+**Configuration File:** `src/main/resources/accepted-numbers.properties`
+
+Example:
+```properties
+# Accepted phone numbers for incoming calls
+# Format: One number per line, with or without country code
+# Lines starting with # are comments
+
+4432304260
+15551234567
+```
+
+**How it works:**
+- Numbers are normalized automatically (removes +, spaces, dashes, etc.)
+- Matches variations: `4432304260`, `14432304260`, `+14432304260`
+- If the file is empty or missing, the gateway accepts all calls
+- Calls to non-accepted numbers are rejected with a SIP hangup
+- All call attempts (accepted and rejected) are logged
+
+**To update accepted numbers:**
+1. Edit `src/main/resources/accepted-numbers.properties`
+2. Rebuild: `mvn clean package`
+3. Deploy the updated JAR to EC2
+4. Restart the service: `sudo systemctl restart nova-voip-gateway`
+
 ## Environment Variables
 
 This project can be configured to run via the `.mjsip-ua` configuration file OR by setting environment variables.  Below is a list of the environment variables in use:
