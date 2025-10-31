@@ -29,7 +29,7 @@ public class ConnectIntegration {
 
     /**
      * Parse Amazon Connect metadata from SIP INVITE message.
-     * Extracts X-Connect-* headers and UUI header.
+     * Extracts X-Amzn-* headers and UUI header.
      *
      * @param msg The SIP INVITE message
      * @return ConnectIntegration instance with parsed data, or null if not a Connect call
@@ -37,11 +37,11 @@ public class ConnectIntegration {
     public static ConnectIntegration fromSipMessage(SipMessage msg) {
         ConnectIntegration integration = new ConnectIntegration();
 
-        // Extract X-Connect-* headers
-        integration.contactId = extractHeader(msg, "X-Connect-ContactId");
-        integration.initialContactId = extractHeader(msg, "X-Connect-InitialContactId");
-        integration.customerPhoneNumber = extractHeader(msg, "X-Connect-CustomerPhoneNumber");
-        integration.instanceArn = extractHeader(msg, "X-Connect-InstanceARN");
+        // Extract X-Amzn-* headers (Amazon Connect uses X-Amzn- prefix, not X-Connect-)
+        integration.contactId = extractHeader(msg, "X-Amzn-ConnectContactId");
+        integration.initialContactId = extractHeader(msg, "X-Amzn-ConnectInitialContactId");
+        integration.customerPhoneNumber = extractHeader(msg, "X-Amzn-CustomerPhoneNumber");
+        integration.instanceArn = extractHeader(msg, "X-Amzn-SourceArn");
 
         // Parse UUI header (hex-encoded JSON)
         String uuiHeader = extractHeader(msg, "User-to-User");
@@ -77,6 +77,9 @@ public class ConnectIntegration {
             // SipMessage.getHeader() returns a Header object, need to get its value
             Object header = msg.getHeader(headerName);
             if (header != null) {
+                if (header instanceof org.mjsip.sip.header.Header) {
+                    return ((org.mjsip.sip.header.Header) header).getValue().trim();
+                }
                 return header.toString().trim();
             }
         } catch (Exception e) {

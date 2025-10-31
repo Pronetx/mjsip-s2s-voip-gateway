@@ -2,6 +2,7 @@ package com.example.s2s.voipgateway;
 
 import com.example.s2s.voipgateway.connect.ConnectIntegration;
 import com.example.s2s.voipgateway.connect.ConnectAttributeManager;
+import com.example.s2s.voipgateway.connect.ConnectClientHelper;
 import com.example.s2s.voipgateway.nova.NovaStreamerFactory;
 import org.mjsip.config.OptionParser;
 import org.mjsip.media.MediaDesc;
@@ -160,18 +161,54 @@ public class NovaSonicVoipGateway extends RegisteringMultipleUAS {
                     if (streamerFactory instanceof NovaStreamerFactory) {
                         ((NovaStreamerFactory) streamerFactory).setCallerPhoneNumber(callerNumber);
 
-                        // Pass attribute manager to streamer factory for tool access
+                        // Pass attribute manager and streamer factory for tool access
                         final ConnectAttributeManager finalAttributeManager = attributeManager;
+                        final NovaStreamerFactory finalStreamerFactory = (NovaStreamerFactory) streamerFactory;
 
                         ((NovaStreamerFactory) streamerFactory).setHangupCallback(() -> {
                             LOG.info("Hangup callback invoked - terminating call");
 
                             // Update Connect attributes if this is a Connect call
                             if (finalAttributeManager != null) {
+                                // Merge conversation tracker data before finalizing
+                                if (finalStreamerFactory.getEventHandler() != null) {
+                                    com.example.s2s.voipgateway.nova.conversation.NovaConversationTracker tracker =
+                                            finalStreamerFactory.getEventHandler().getConversationTracker();
+                                    if (tracker != null) {
+                                        LOG.info("Merging conversation tracker data: Intent={}, Sentiment={}, Turns={}",
+                                                tracker.getDetectedIntent(), tracker.getDetectedSentiment(), tracker.getTurnCount());
+                                        finalAttributeManager.mergeConversationData(tracker.getConversationAttributes());
+                                    }
+                                }
+
                                 LOG.info("Updating Connect attributes before hangup");
-                                // TODO: Implement UpdateContactAttributes API call
                                 java.util.Map<String, String> finalAttributes = finalAttributeManager.getAttributesForUpdate();
                                 LOG.info("Final attributes to update: {}", finalAttributes);
+
+                                // Extract instance ID and contact ID for API call
+                                String instanceArn = finalAttributeManager.getInstanceArn();
+                                String contactId = finalAttributeManager.getContactId();
+
+                                if (instanceArn != null && contactId != null) {
+                                    String instanceId = ConnectClientHelper.extractInstanceId(instanceArn);
+                                    if (instanceId != null) {
+                                        LOG.info("Calling UpdateContactAttributes API for Contact: {} in Instance: {}", contactId, instanceId);
+                                        boolean success = ConnectClientHelper.updateContactAttributes(
+                                                instanceId,
+                                                contactId,
+                                                finalAttributes
+                                        );
+                                        if (success) {
+                                            LOG.info("Successfully updated Connect contact attributes");
+                                        } else {
+                                            LOG.warn("Failed to update Connect contact attributes");
+                                        }
+                                    } else {
+                                        LOG.warn("Could not extract instance ID from ARN: {}", instanceArn);
+                                    }
+                                } else {
+                                    LOG.warn("Missing instanceArn or contactId - cannot update attributes");
+                                }
                             }
 
                             // Clear CloudWatch log stream

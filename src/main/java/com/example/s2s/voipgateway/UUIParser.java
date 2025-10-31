@@ -43,7 +43,13 @@ public class UUIParser {
             String jsonString = hexToString(hexEncodedJson.trim());
             LOG.debug("Decoded UUI hex to JSON: {}", jsonString);
 
-            // Step 2: Parse JSON
+            // Step 2: Clean the JSON string (remove BOM and other non-printable characters)
+            jsonString = jsonString.trim()
+                    .replaceAll("^[^{\\[]+", "")  // Remove anything before opening brace/bracket
+                    .replaceAll("[^}\\]]+$", ""); // Remove anything after closing brace/bracket
+            LOG.debug("Cleaned JSON string: {}", jsonString);
+
+            // Step 3: Parse JSON
             JSONObject jsonObject = new JSONObject(jsonString);
 
             // Step 3: Convert to Map

@@ -38,6 +38,7 @@ public class NovaStreamerFactory implements StreamerFactory {
     private final NovaMediaConfig mediaConfig;
     private String callerPhoneNumber;
     private Runnable hangupCallback;
+    private com.example.s2s.voipgateway.nova.tools.ModularNovaS2SEventHandler eventHandler;
 
     public NovaStreamerFactory(NovaMediaConfig mediaConfig) {
         this.mediaConfig = mediaConfig;
@@ -59,6 +60,14 @@ public class NovaStreamerFactory implements StreamerFactory {
     public void setHangupCallback(Runnable hangupCallback) {
         this.hangupCallback = hangupCallback;
         log.info("Set hangup callback");
+    }
+
+    /**
+     * Get the event handler to access conversation tracker.
+     * Only available after createMediaStreamer() is called.
+     */
+    public com.example.s2s.voipgateway.nova.tools.ModularNovaS2SEventHandler getEventHandler() {
+        return eventHandler;
     }
 
     /**
@@ -98,13 +107,12 @@ public class NovaStreamerFactory implements StreamerFactory {
         NovaS2SBedrockInteractClient novaClient = new NovaS2SBedrockInteractClient(client, "amazon.nova-sonic-v1:0");
 
         // Use the new modular tool system with auto-discovery
-        com.example.s2s.voipgateway.nova.tools.ModularNovaS2SEventHandler eventHandler;
         if (callerPhoneNumber != null && !callerPhoneNumber.isEmpty()) {
             log.info("Creating ModularNovaS2SEventHandler with caller phone: {}", callerPhoneNumber);
-            eventHandler = new com.example.s2s.voipgateway.nova.tools.ModularNovaS2SEventHandler(callerPhoneNumber);
+            this.eventHandler = new com.example.s2s.voipgateway.nova.tools.ModularNovaS2SEventHandler(callerPhoneNumber);
         } else {
             log.warn("No caller phone number set, using ModularNovaS2SEventHandler with placeholder");
-            eventHandler = new com.example.s2s.voipgateway.nova.tools.ModularNovaS2SEventHandler("unknown");
+            this.eventHandler = new com.example.s2s.voipgateway.nova.tools.ModularNovaS2SEventHandler("unknown");
         }
 
         // Set hangup callback if provided

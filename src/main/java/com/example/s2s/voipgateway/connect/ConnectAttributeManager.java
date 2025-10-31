@@ -126,6 +126,23 @@ public class ConnectAttributeManager {
     }
 
     /**
+     * Merge conversation data from NovaConversationTracker.
+     * This provides automatic intent, sentiment, and entity extraction.
+     */
+    public void mergeConversationData(Map<String, String> conversationAttributes) {
+        if (conversationAttributes == null || conversationAttributes.isEmpty()) {
+            return;
+        }
+
+        // Merge all conversation attributes
+        for (Map.Entry<String, String> entry : conversationAttributes.entrySet()) {
+            setAttribute(entry.getKey(), entry.getValue());
+        }
+
+        LOG.info("Merged {} conversation attributes from tracker", conversationAttributes.size());
+    }
+
+    /**
      * Mark conversation as complete and finalize timestamps.
      */
     public void completeConversation() {
@@ -136,8 +153,10 @@ public class ConnectAttributeManager {
         long durationSeconds = java.time.Duration.between(conversationStartTime, conversationEndTime).getSeconds();
         setAttribute("Nova_ConversationDurationSeconds", String.valueOf(durationSeconds));
 
-        // Set full transcript
-        setAttribute("Nova_Transcript", conversationTranscript.toString());
+        // Set full transcript (only if not already set by conversation tracker)
+        if (!attributes.containsKey("Nova_Transcript") && conversationTranscript.length() > 0) {
+            setAttribute("Nova_Transcript", conversationTranscript.toString());
+        }
 
         LOG.info("Conversation completed - Duration: {}s, Transcript length: {} chars, Barge-ins: {}, Tools used: {}",
                 durationSeconds, conversationTranscript.length(), bargeInCount.get(), toolInvocationCount);

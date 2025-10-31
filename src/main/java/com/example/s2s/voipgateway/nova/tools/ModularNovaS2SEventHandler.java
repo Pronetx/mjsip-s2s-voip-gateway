@@ -1,6 +1,7 @@
 package com.example.s2s.voipgateway.nova.tools;
 
 import com.example.s2s.voipgateway.nova.AbstractNovaS2SEventHandler;
+import com.example.s2s.voipgateway.nova.conversation.NovaConversationTracker;
 import com.example.s2s.voipgateway.nova.event.PromptStartEvent;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
@@ -16,6 +17,7 @@ import java.util.Map;
 public class ModularNovaS2SEventHandler extends AbstractNovaS2SEventHandler {
     private static final Logger log = LoggerFactory.getLogger(ModularNovaS2SEventHandler.class);
     private final ToolRegistry toolRegistry;
+    private final NovaConversationTracker conversationTracker;
     private volatile boolean audioEndTurnReceived = false;
     private volatile boolean textEndTurnReceived = false;
 
@@ -25,6 +27,7 @@ public class ModularNovaS2SEventHandler extends AbstractNovaS2SEventHandler {
      */
     public ModularNovaS2SEventHandler(String phoneNumber) {
         this.toolRegistry = new ToolRegistry();
+        this.conversationTracker = new NovaConversationTracker();
         initializeAllTools(phoneNumber);
     }
 
@@ -35,6 +38,7 @@ public class ModularNovaS2SEventHandler extends AbstractNovaS2SEventHandler {
      */
     public ModularNovaS2SEventHandler(String phoneNumber, PromptConfiguration promptConfig) {
         this.toolRegistry = new ToolRegistry();
+        this.conversationTracker = new NovaConversationTracker();
         initializeToolsFromConfig(phoneNumber, promptConfig);
     }
 
@@ -44,6 +48,7 @@ public class ModularNovaS2SEventHandler extends AbstractNovaS2SEventHandler {
      */
     public ModularNovaS2SEventHandler(ToolRegistry toolRegistry) {
         this.toolRegistry = toolRegistry;
+        this.conversationTracker = new NovaConversationTracker();
     }
 
     /**
@@ -176,6 +181,31 @@ public class ModularNovaS2SEventHandler extends AbstractNovaS2SEventHandler {
                 }
             }
         }
+    }
+
+    @Override
+    public void handleTextOutput(JsonNode node) {
+        super.handleTextOutput(node);
+
+        // Capture text for transcript
+        if (node.has("content") && node.has("role")) {
+            String content = node.get("content").asText();
+            String role = node.get("role").asText();
+
+            if ("user".equalsIgnoreCase(role)) {
+                conversationTracker.addUserTurn(content);
+            } else if ("assistant".equalsIgnoreCase(role)) {
+                conversationTracker.addNovaTurn(content);
+            }
+        }
+    }
+
+    /**
+     * Get the conversation tracker for accessing conversation data.
+     * @return The conversation tracker
+     */
+    public NovaConversationTracker getConversationTracker() {
+        return conversationTracker;
     }
 
     @Override

@@ -31,6 +31,7 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
     private String promptName;
     private boolean debugAudioOutput;
     private boolean playedErrorSound = false;
+    private volatile boolean dropAssistantFramesUntilNextStart = false;
 
     public AbstractNovaS2SEventHandler() {
         this(null);
@@ -50,7 +51,13 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
 
     @Override
     public void handleContentStart(JsonNode node) {
+        String type = node.has("type") ? node.get("type").asText() : "";
+        String role = node.has("role") ? node.get("role").asText() : "";
 
+        // Reset drop flag on fresh assistant audio start
+        if ("AUDIO".equals(type) && "ASSISTANT".equals(role)) {
+            dropAssistantFramesUntilNextStart = false;
+        }
     }
 
     @Override
@@ -60,6 +67,14 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
 
     @Override
     public void handleAudioOutput(JsonNode node) {
+        // Drop late-arriving frames if INTERRUPTED already came in
+        if (dropAssistantFramesUntilNextStart) {
+            if (debugAudioOutput) {
+                log.debug("Dropping assistant frame (armed by Nova INTERRUPTED)");
+            }
+            return;
+        }
+
         String content = node.get("content").asText();
         String role = node.get("role").asText();
         if (debugAudioOutput) {
@@ -75,10 +90,29 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
 
     @Override
     public void handleContentEnd(JsonNode node) {
+        String stopReason = node.has("stopReason") ? node.get("stopReason").asText() : "";
+
+        // FAST PATH: Nova barge-in signal - act immediately before any logging
+        if (stopReason.contains("INTERRUPT")) {
+            // Clear buffered audio and squelch for ~150ms to prevent glitches
+            audioStream.interruptNow(150);
+            dropAssistantFramesUntilNextStart = true;
+            // Log after action is taken
+            log.info("Barge-in INTERRUPTED - cleared queue and armed frame drop");
+            return;
+        }
+
+        // Normal path: log and handle other cases
         log.info("Content end for node: {}", node);
         String contentId = node.get("contentId").asText();
-        String stopReason = node.has("stopReason") ? node.get("stopReason").asText() : "";
+        String contentType = node.has("type") ? node.get("type").asText() : "";
         log.info("Content ended: {} with reason: {}", contentId, stopReason);
+
+        // Handle end of turn: pad and add comfort silence
+        if ("END_TURN".equals(stopReason) && "AUDIO".equals(contentType)) {
+            log.debug("Assistant turn ended - finalizing audio stream");
+            audioStream.endOfTurn();
+        }
     }
 
     @Override

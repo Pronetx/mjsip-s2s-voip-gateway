@@ -64,6 +64,15 @@ export class VoipGatewayEC2Stack extends cdk.Stack {
               effect: iam.Effect.ALLOW
             })
           ]
+        }),
+        'ConnectAccess': new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              actions: ['connect:UpdateContactAttributes'],
+              resources: ['*'],
+              effect: iam.Effect.ALLOW
+            })
+          ]
         })
       },
     });
