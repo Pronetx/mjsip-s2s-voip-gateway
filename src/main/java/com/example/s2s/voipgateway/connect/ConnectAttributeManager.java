@@ -1,10 +1,13 @@
 package com.example.s2s.voipgateway.connect;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -19,7 +22,8 @@ public class ConnectAttributeManager {
     private final Map<String, String> attributes;
     private final AtomicInteger bargeInCount;
     private final StringBuilder conversationTranscript;
-    private final StringBuilder toolInvocations;
+    private final List<Map<String, Object>> toolInvocations;
+    private final ObjectMapper objectMapper;
 
     private Instant conversationStartTime;
     private Instant conversationEndTime;
@@ -32,7 +36,8 @@ public class ConnectAttributeManager {
         this.attributes = new HashMap<>();
         this.bargeInCount = new AtomicInteger(0);
         this.conversationTranscript = new StringBuilder();
-        this.toolInvocations = new StringBuilder();
+        this.toolInvocations = new ArrayList<>();
+        this.objectMapper = new ObjectMapper();
         this.conversationStartTime = Instant.now();
         this.toolInvocationCount = 0;
 
@@ -88,21 +93,38 @@ public class ConnectAttributeManager {
     public void recordToolInvocation(String toolName, String parameters) {
         toolInvocationCount++;
 
-        // Add to tool invocations log
-        if (toolInvocations.length() > 0) {
-            toolInvocations.append("; ");
-        }
-        toolInvocations.append(toolName);
+        // Create tool invocation record
+        Map<String, Object> invocation = new HashMap<>();
+        invocation.put("tool", toolName);
+        invocation.put("timestamp", Instant.now().toString());
+
+        // Parse parameters as JSON if provided
         if (parameters != null && !parameters.isEmpty()) {
-            toolInvocations.append("(").append(parameters).append(")");
+            try {
+                Object parsedParams = objectMapper.readValue(parameters, Object.class);
+                invocation.put("parameters", parsedParams);
+            } catch (Exception e) {
+                // If not valid JSON, store as string
+                invocation.put("parameters", parameters);
+            }
         }
 
+        toolInvocations.add(invocation);
+
+        // Update Connect attributes
         setAttribute("Nova_ToolInvocationCount", String.valueOf(toolInvocationCount));
         setAttribute("Nova_LastToolInvoked", toolName);
         setAttribute("Nova_LastToolTimestamp", Instant.now().toString());
-        setAttribute("Nova_ToolInvocations", toolInvocations.toString());
 
-        LOG.info("Tool invocation recorded: {}({}) - Total: {}", toolName, parameters, toolInvocationCount);
+        // Serialize to JSON
+        try {
+            String json = objectMapper.writeValueAsString(toolInvocations);
+            setAttribute("Nova_ToolInvocations", json);
+        } catch (Exception e) {
+            LOG.error("Failed to serialize tool invocations to JSON", e);
+        }
+
+        LOG.info("Tool invocation recorded: {} with params: {} - Total: {}", toolName, parameters, toolInvocationCount);
     }
 
     /**
