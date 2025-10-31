@@ -20,6 +20,7 @@ public class ModularNovaS2SEventHandler extends AbstractNovaS2SEventHandler {
     private final NovaConversationTracker conversationTracker;
     private volatile boolean audioEndTurnReceived = false;
     private volatile boolean textEndTurnReceived = false;
+    private com.example.s2s.voipgateway.connect.ConnectAttributeManager attributeManager;
 
     /**
      * Creates a handler with all auto-discovered tools enabled.
@@ -131,6 +132,11 @@ public class ModularNovaS2SEventHandler extends AbstractNovaS2SEventHandler {
 
         log.info("Handling tool invocation: {} with content: {}", toolName, content);
 
+        // Record tool invocation to Connect attributes
+        if (attributeManager != null) {
+            attributeManager.recordToolInvocation(toolName, content);
+        }
+
         boolean handled = toolRegistry.handle(toolName, toolUseId, content, output);
         if (!handled) {
             output.put("status", "error");
@@ -206,6 +212,14 @@ public class ModularNovaS2SEventHandler extends AbstractNovaS2SEventHandler {
      */
     public NovaConversationTracker getConversationTracker() {
         return conversationTracker;
+    }
+
+    /**
+     * Set the ConnectAttributeManager for recording tool invocations.
+     * @param attributeManager The attribute manager
+     */
+    public void setAttributeManager(com.example.s2s.voipgateway.connect.ConnectAttributeManager attributeManager) {
+        this.attributeManager = attributeManager;
     }
 
     @Override

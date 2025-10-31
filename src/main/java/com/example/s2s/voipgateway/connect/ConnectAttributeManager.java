@@ -19,6 +19,7 @@ public class ConnectAttributeManager {
     private final Map<String, String> attributes;
     private final AtomicInteger bargeInCount;
     private final StringBuilder conversationTranscript;
+    private final StringBuilder toolInvocations;
 
     private Instant conversationStartTime;
     private Instant conversationEndTime;
@@ -31,6 +32,7 @@ public class ConnectAttributeManager {
         this.attributes = new HashMap<>();
         this.bargeInCount = new AtomicInteger(0);
         this.conversationTranscript = new StringBuilder();
+        this.toolInvocations = new StringBuilder();
         this.conversationStartTime = Instant.now();
         this.toolInvocationCount = 0;
 
@@ -81,14 +83,33 @@ public class ConnectAttributeManager {
     }
 
     /**
-     * Record tool invocation.
+     * Record tool invocation with parameters.
      */
-    public void recordToolInvocation(String toolName) {
+    public void recordToolInvocation(String toolName, String parameters) {
         toolInvocationCount++;
+
+        // Add to tool invocations log
+        if (toolInvocations.length() > 0) {
+            toolInvocations.append("; ");
+        }
+        toolInvocations.append(toolName);
+        if (parameters != null && !parameters.isEmpty()) {
+            toolInvocations.append("(").append(parameters).append(")");
+        }
+
         setAttribute("Nova_ToolInvocationCount", String.valueOf(toolInvocationCount));
         setAttribute("Nova_LastToolInvoked", toolName);
         setAttribute("Nova_LastToolTimestamp", Instant.now().toString());
-        LOG.info("Tool invocation recorded: {} (Total: {})", toolName, toolInvocationCount);
+        setAttribute("Nova_ToolInvocations", toolInvocations.toString());
+
+        LOG.info("Tool invocation recorded: {}({}) - Total: {}", toolName, parameters, toolInvocationCount);
+    }
+
+    /**
+     * Record tool invocation without parameters.
+     */
+    public void recordToolInvocation(String toolName) {
+        recordToolInvocation(toolName, null);
     }
 
     /**

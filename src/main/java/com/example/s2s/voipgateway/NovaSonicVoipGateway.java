@@ -159,13 +159,14 @@ public class NovaSonicVoipGateway extends RegisteringMultipleUAS {
 
                     // Set the caller phone number and hangup callback for the tool system
                     if (streamerFactory instanceof NovaStreamerFactory) {
-                        ((NovaStreamerFactory) streamerFactory).setCallerPhoneNumber(callerNumber);
+                        NovaStreamerFactory novaFactory = (NovaStreamerFactory) streamerFactory;
+                        novaFactory.setCallerPhoneNumber(callerNumber);
 
                         // Pass attribute manager and streamer factory for tool access
                         final ConnectAttributeManager finalAttributeManager = attributeManager;
-                        final NovaStreamerFactory finalStreamerFactory = (NovaStreamerFactory) streamerFactory;
+                        final NovaStreamerFactory finalStreamerFactory = novaFactory;
 
-                        ((NovaStreamerFactory) streamerFactory).setHangupCallback(() -> {
+                        novaFactory.setHangupCallback(() -> {
                             LOG.info("Hangup callback invoked - terminating call");
 
                             // Update Connect attributes if this is a Connect call
@@ -219,6 +220,24 @@ public class NovaSonicVoipGateway extends RegisteringMultipleUAS {
                     }
 
                     ua.accept(new MediaAgent(mediaConfig.getMediaDescs(), streamerFactory));
+
+                    // After MediaAgent is created, set attributeManager on event handler for tool tracking
+                    if (streamerFactory instanceof NovaStreamerFactory) {
+                        NovaStreamerFactory novaFactory = (NovaStreamerFactory) streamerFactory;
+                        final ConnectAttributeManager finalAttrMgr = attributeManager;
+                        // The event handler is created in createMediaStreamer, so we need to wait a moment
+                        new Thread(() -> {
+                            try {
+                                Thread.sleep(500); // Wait for MediaStreamer to be created
+                                if (novaFactory.getEventHandler() != null && finalAttrMgr != null) {
+                                    novaFactory.getEventHandler().setAttributeManager(finalAttrMgr);
+                                    LOG.info("Set attributeManager on event handler for tool tracking");
+                                }
+                            } catch (Exception e) {
+                                LOG.error("Failed to set attributeManager on event handler", e);
+                            }
+                        }).start();
+                    }
                 } else {
                     LOG.warn("Rejecting call to unaccepted number: {}", calledNumber);
 
