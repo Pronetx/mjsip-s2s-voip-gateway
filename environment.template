@@ -9,3 +9,33 @@ DISPLAY_NAME=
 # Trunk Mode: Set to false to disable registration (inbound calls only)
 # Set to true to register with the SIP server
 DO_REGISTER=false
+
+# Media Configuration
+MEDIA_PORT_BASE=10000
+MEDIA_PORT_COUNT=10000
+
+# Nova Configuration
+# NOVA_VOICE_ID - Voice to use (default: en_us_matthew)
+NOVA_VOICE_ID=en_us_matthew
+
+# NOVA_PROMPT - Either a prompt file name (e.g., "default.prompt") or direct text
+#               If ending in .prompt, loads from src/main/resources/prompts/
+#               Default: loads from prompts/default.prompt if not specified
+# NOVA_PROMPT=default.prompt
+
+# AWS Pinpoint Configuration
+# PINPOINT_APPLICATION_ID - AWS Pinpoint application ID for SMS functionality
+#                           Required by SendSMSTool and SendOTPTool
+PINPOINT_APPLICATION_ID=f87ebc6cb0924d51a0e0de7dfa5ddc3f
+
+# CloudWatch Logs Configuration
+# CLOUDWATCH_LOGGING_ENABLED - Enable CloudWatch Logs (true/false)
+# INSTANCE_ID - EC2 instance ID for log organization (auto-detected if not set)
+# AWS_REGION - AWS region for CloudWatch Logs (default: us-west-2)
+CLOUDWATCH_LOGGING_ENABLED=true
+# INSTANCE_ID will be auto-detected from EC2 metadata
+# AWS_REGION=us-west-2
+
+# Address Validation Lambda
+# ADDRESS_VALIDATION_LAMBDA_URL - Lambda function URL for address validation
+ADDRESS_VALIDATION_LAMBDA_URL=https://yo3qim52ngs3euzwkdxidl3isa0zomgt.lambda-url.us-west-2.on.aws/

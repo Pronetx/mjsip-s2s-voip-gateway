@@ -41,6 +41,29 @@ export class VoipGatewayEC2Stack extends cdk.Stack {
               effect: iam.Effect.ALLOW
             })
           ]
+        }),
+        'PinpointAccess': new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              actions: ['mobiletargeting:SendMessages'],
+              resources: ['arn:aws:mobiletargeting:*:*:apps/*/messages'],
+              effect: iam.Effect.ALLOW
+            })
+          ]
+        }),
+        'CloudWatchLogsAccess': new iam.PolicyDocument({
+          statements: [
+            new iam.PolicyStatement({
+              actions: [
+                'logs:CreateLogGroup',
+                'logs:CreateLogStream',
+                'logs:PutLogEvents',
+                'logs:DescribeLogStreams'
+              ],
+              resources: ['arn:aws:logs:*:*:log-group:/aws/voip-gateway/*'],
+              effect: iam.Effect.ALLOW
+            })
+          ]
         })
       },
     });

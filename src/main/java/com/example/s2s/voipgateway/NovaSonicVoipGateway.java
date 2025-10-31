@@ -1,5 +1,7 @@
 package com.example.s2s.voipgateway;
 
+import com.example.s2s.voipgateway.connect.ConnectIntegration;
+import com.example.s2s.voipgateway.connect.ConnectAttributeManager;
 import com.example.s2s.voipgateway.nova.NovaStreamerFactory;
 import org.mjsip.config.OptionParser;
 import org.mjsip.media.MediaDesc;
@@ -115,15 +117,77 @@ public class NovaSonicVoipGateway extends RegisteringMultipleUAS {
                                          MediaDesc[] media_descs) {
                 LOG.info("Incoming call from: {} to: {}", caller.getAddress(), callee.getAddress());
 
+                // Parse Amazon Connect integration data from SIP headers
+                ConnectIntegration connectIntegration = ConnectIntegration.fromSipMessage(msg);
+                ConnectAttributeManager attributeManager = null;
+
+                if (connectIntegration != null && connectIntegration.isConnectCall()) {
+                    LOG.info("Amazon Connect call detected - Contact ID: {}", connectIntegration.getContactId());
+
+                    // Initialize CloudWatch log stream with Connect contact ID
+                    String logStream = com.example.s2s.voipgateway.logging.CloudWatchLogManager
+                            .initializeConnectLogStream(connectIntegration.getContactId());
+                    LOG.info("Initialized Connect log stream: {}", logStream);
+
+                    // Create attribute manager for tracking conversation state
+                    attributeManager = new ConnectAttributeManager(connectIntegration);
+
+                    // Load initial attributes from UUI data
+                    if (connectIntegration.getUuiData() != null && !connectIntegration.getUuiData().isEmpty()) {
+                        LOG.info("Loading {} initial attributes from Connect", connectIntegration.getUuiData().size());
+                        connectIntegration.getUuiData().forEach(attributeManager::setAttribute);
+                    }
+                } else {
+                    LOG.info("Direct call (non-Connect) - using session-based log stream");
+                    String sessionId = java.util.UUID.randomUUID().toString();
+                    String logStream = com.example.s2s.voipgateway.logging.CloudWatchLogManager
+                            .initializeSessionLogStream(sessionId);
+                    LOG.info("Initialized session log stream: {}", logStream);
+                }
+
+                // Extract the caller's phone number (From address)
+                String callerNumber = extractPhoneNumber(caller.getAddress().toString());
+                LOG.info("Extracted caller phone number: {}", callerNumber);
+
                 // Extract the called number (To address)
                 String calledNumber = extractPhoneNumber(callee.getAddress().toString());
 
                 // Check if the call is for our accepted number (4432304260, 14432304260, or +14432304260)
                 if (isAcceptedNumber(calledNumber)) {
                     LOG.info("Accepting call to: {}", calledNumber);
+
+                    // Set the caller phone number and hangup callback for the tool system
+                    if (streamerFactory instanceof NovaStreamerFactory) {
+                        ((NovaStreamerFactory) streamerFactory).setCallerPhoneNumber(callerNumber);
+
+                        // Pass attribute manager to streamer factory for tool access
+                        final ConnectAttributeManager finalAttributeManager = attributeManager;
+
+                        ((NovaStreamerFactory) streamerFactory).setHangupCallback(() -> {
+                            LOG.info("Hangup callback invoked - terminating call");
+
+                            // Update Connect attributes if this is a Connect call
+                            if (finalAttributeManager != null) {
+                                LOG.info("Updating Connect attributes before hangup");
+                                // TODO: Implement UpdateContactAttributes API call
+                                java.util.Map<String, String> finalAttributes = finalAttributeManager.getAttributesForUpdate();
+                                LOG.info("Final attributes to update: {}", finalAttributes);
+                            }
+
+                            // Clear CloudWatch log stream
+                            com.example.s2s.voipgateway.logging.CloudWatchLogManager.clearSessionLogStream();
+
+                            ua.hangup();
+                        });
+                    }
+
                     ua.accept(new MediaAgent(mediaConfig.getMediaDescs(), streamerFactory));
                 } else {
                     LOG.warn("Rejecting call to unaccepted number: {}", calledNumber);
+
+                    // Clear log stream before hanging up
+                    com.example.s2s.voipgateway.logging.CloudWatchLogManager.clearSessionLogStream();
+
                     ua.hangup();
                 }
             }
@@ -230,7 +294,18 @@ public class NovaSonicVoipGateway extends RegisteringMultipleUAS {
      * The main method.
      */
     public static void main(String[] args) {
+        // Initialize CloudWatch log stream BEFORE any logging occurs
+        String startupLogStream = com.example.s2s.voipgateway.logging.CloudWatchLogManager.initializeCustomLogStream(
+                "startup",
+                java.time.Instant.now().toString().replace(":", "-")
+        );
+
         println("mjSIP UserAgent " + SipStack.version);
+
+        LOG.info("=== Nova S2S VoIP Gateway Starting ===");
+        LOG.info("Version: mjSIP {}", SipStack.version);
+        LOG.info("CloudWatch Log Stream: {}", startupLogStream != null ? startupLogStream : "disabled");
+
         SipConfig sipConfig = new SipConfig();
         UAConfig uaConfig = new UAConfig();
         SchedulerConfig schedulerConfig = new SchedulerConfig();
@@ -239,8 +314,27 @@ public class NovaSonicVoipGateway extends RegisteringMultipleUAS {
         NovaMediaConfig mediaConfig = new NovaMediaConfig();
         Map<String, String> environ = System.getenv();
         mediaConfig.setNovaVoiceId(environ.getOrDefault("NOVA_VOICE_ID","en_us_matthew"));
+
+        // Load prompt from environment variable
+        // Supports both direct prompt text and file paths (ending in .prompt)
         if (isConfigured(environ.get("NOVA_PROMPT"))) {
-            mediaConfig.setNovaPrompt(environ.get("NOVA_PROMPT"));
+            String promptValue = environ.get("NOVA_PROMPT");
+            if (promptValue.endsWith(".prompt")) {
+                // Load from file in prompts/ directory
+                String promptContent = NovaMediaConfig.loadPromptFromFile(promptValue);
+                if (promptContent != null) {
+                    mediaConfig.setNovaPrompt(promptContent);
+                    LOG.info("Loaded prompt from file: {}", promptValue);
+                } else {
+                    LOG.warn("Failed to load prompt file: {}, using default", promptValue);
+                }
+            } else {
+                // Direct prompt text
+                mediaConfig.setNovaPrompt(promptValue);
+                LOG.info("Using prompt from NOVA_PROMPT environment variable");
+            }
+        } else {
+            LOG.info("Using default prompt from prompts/default.prompt");
         }
 
         if (isConfigured(environ.get("SIP_SERVER"))) {

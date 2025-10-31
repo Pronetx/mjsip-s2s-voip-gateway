@@ -219,11 +219,63 @@ The entrypoint for the application is NovaSonicVoipGateway.java.  This class con
 
 The main entry point for the Nova integration is in NovaStreamerFactory.java, where the Bedrock client is instantiated and the audio streams are established.
 
-By default, the gateway includes a toolset that gives Nova Sonic the ability to retrieve the date and time, but this can be extended to do much more.  The example tools can be found in com.example.s2s.voipgateway.nova.tools.
+### Modular Tool System with Auto-Discovery
 
-New tools can be developed by extending the AbstractNovaS2SEventHandler class and implementing the functionality you desire.  See the javadoc in AbstractNovaS2SEventHandler for more information.  An easy starting point for new tools would be to copy the DateTimeNovaS2SEventHandler to a new file, replacing the tools with something relevant to your use case.
+The gateway uses a **modular, auto-discovery tool system** that allows you to add new Nova Sonic tools without modifying existing code. Tools are automatically discovered at runtime.
 
-The tool set is instantiated in NovaStreamerFactory.createMediaStreamer().  If you create new tools you'll need to update the NovaS2SEventHandler to instantiate your new class.
+**Available Tools** (found in `src/main/java/com/example/s2s/voipgateway/nova/tools/`):
+- `DateTimeTool` - Get current date and time
+- `GetCallerPhoneTool` - Retrieve the caller's phone number
+- `SendOTPTool` - Send authentication codes via SMS (requires AWS Pinpoint)
+- `VerifyOTPTool` - Verify authentication codes
+- `HangupTool` - End the current call
+- `SendSMSTool` - Send SMS messages (requires AWS Pinpoint)
+- `CollectAddressTool` - Collect address information
+- `AddressValidationTool` - Validate addresses
+
+**Adding a New Tool** - Just create a class implementing the `Tool` interface:
+
+```java
+package com.example.s2s.voipgateway.nova.tools;
+
+import java.util.Map;
+
+public class MyCustomTool implements Tool {
+    @Override
+    public String getName() {
+        return "myCustomTool";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Description that tells Nova when to use this tool";
+    }
+
+    @Override
+    public Map<String, String> getInputSchema() {
+        return ToolSpecs.DEFAULT_TOOL_SPEC;
+    }
+
+    @Override
+    public void handle(String toolUseId, String content, Map<String, Object> output) throws Exception {
+        // Your tool logic here
+        output.put("status", "success");
+        output.put("message", "Tool executed successfully");
+    }
+}
+```
+
+**That's it!** The tool is automatically discovered and registered. No manual registration needed.
+
+**Tool Architecture:**
+- `Tool.java` - Interface that all tools implement
+- `ToolFactory.java` - Auto-discovers and creates tool instances with dependency injection
+- `ToolRegistry.java` - Manages available tools at runtime
+- `ModularNovaS2SEventHandler.java` - Handler that orchestrates tool invocations
+
+For more details, see:
+- `src/main/java/com/example/s2s/voipgateway/nova/tools/README.md` - Usage guide
+- `src/main/java/com/example/s2s/voipgateway/nova/tools/ARCHITECTURE.md` - Architecture documentation
 
 
 

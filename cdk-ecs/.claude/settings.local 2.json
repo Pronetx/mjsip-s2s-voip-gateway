@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/yasser/Documents/Code/mjsip-s2s-voip-gateway/**)",
+      "Bash(npm install)",
+      "Bash(npx cdk:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

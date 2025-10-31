@@ -93,7 +93,7 @@ public class NovaAudioOutputStream extends OutputStream {
     public void close() throws IOException {
         observer.onNext(new EndAudioContent(EndAudioContent.ContentEnd.builder()
                 .promptName(promptName)
-                .contentName(UUID.randomUUID().toString())
+                .contentName(this.contentName)  // Use the same contentName that was used in contentStart
                 .build()));
         if (audioFileOutput!=null) {
             audioFileOutput.close();

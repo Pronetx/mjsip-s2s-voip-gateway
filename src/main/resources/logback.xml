@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Console appender for local development -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} -- %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- CloudWatch Logs appender with unique log stream per session -->
+    <appender name="CLOUDWATCH" class="ca.pjer.logback.AwsLogsAppender">
+        <!-- Log group name -->
+        <logGroupName>/aws/voip-gateway/nova-sonic</logGroupName>
+
+        <!--
+            Log stream name with timestamp and startup indicator
+            Format: instance-id/startup-uuid
+        -->
+        <logStreamUuidPrefix>${INSTANCE_ID:-unknown}/startup-</logStreamUuidPrefix>
+
+        <!-- Create log group if it doesn't exist -->
+        <createLogGroup>true</createLogGroup>
+
+        <!-- AWS region -->
+        <region>${AWS_REGION:-us-west-2}</region>
+
+        <!-- Maximum number of events to buffer before sending -->
+        <maxBatchLogEvents>10</maxBatchLogEvents>
+
+        <!-- Maximum time (ms) to buffer events before sending (5 seconds) -->
+        <maxFlushTimeMillis>5000</maxFlushTimeMillis>
+
+        <!-- Maximum batch size in bytes -->
+        <maxBatchSize>1048576</maxBatchSize>
+
+        <!-- Internal queue size -->
+        <internalQueueSize>8192</internalQueueSize>
+
+        <!-- Log pattern -->
+        <layout>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} -- %msg%n</pattern>
+        </layout>
+    </appender>
+
+    <!-- Async wrapper for CloudWatch to avoid blocking -->
+    <appender name="ASYNC_CLOUDWATCH" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="CLOUDWATCH" />
+    </appender>
+
+    <!-- Root logger -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+        <!-- CloudWatch appender is always added when CLOUDWATCH_LOGGING_ENABLED=true -->
+        <appender-ref ref="ASYNC_CLOUDWATCH" />
+    </root>
+
+    <!-- Reduce noise from verbose libraries -->
+    <logger name="org.mjsip" level="INFO" />
+    <logger name="io.netty" level="WARN" />
+    <logger name="software.amazon.awssdk" level="WARN" />
+
+    <!-- Enable debug for our code -->
+    <logger name="com.example.s2s.voipgateway" level="DEBUG" />
+</configuration>
