@@ -91,11 +91,9 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
     @Override
     public void handleContentEnd(JsonNode node) {
         String stopReason = node.has("stopReason") ? node.get("stopReason").asText() : "";
-        String contentType = node.has("type") ? node.get("type").asText() : "";
 
-        // FAST PATH: Nova AUDIO barge-in signal - act immediately before any logging
-        // Only handle INTERRUPTED for AUDIO content, not TEXT (TEXT interruptions are normal during tools)
-        if (stopReason.contains("INTERRUPT") && "AUDIO".equals(contentType)) {
+        // FAST PATH: Nova barge-in signal - act immediately before any logging
+        if (stopReason.contains("INTERRUPT")) {
             // Clear buffered audio and squelch for ~150ms to prevent glitches
             audioStream.interruptNow(150);
             dropAssistantFramesUntilNextStart = true;
@@ -107,6 +105,7 @@ public abstract class AbstractNovaS2SEventHandler implements NovaS2SEventHandler
         // Normal path: log and handle other cases
         log.info("Content end for node: {}", node);
         String contentId = node.get("contentId").asText();
+        String contentType = node.has("type") ? node.get("type").asText() : "";
         log.info("Content ended: {} with reason: {}", contentId, stopReason);
 
         // Handle end of turn: pad and add comfort silence
