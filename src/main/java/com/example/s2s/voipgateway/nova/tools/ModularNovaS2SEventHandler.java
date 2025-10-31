@@ -132,9 +132,17 @@ public class ModularNovaS2SEventHandler extends AbstractNovaS2SEventHandler {
 
         log.info("Handling tool invocation: {} with content: {}", toolName, content);
 
-        // Record tool invocation to Connect attributes
+        // Record tool invocation to Connect attributes (async to avoid blocking audio path)
         if (attributeManager != null) {
-            attributeManager.recordToolInvocation(toolName, content);
+            final String finalToolName = toolName;
+            final String finalContent = content;
+            new Thread(() -> {
+                try {
+                    attributeManager.recordToolInvocation(finalToolName, finalContent);
+                } catch (Exception e) {
+                    log.error("Failed to record tool invocation", e);
+                }
+            }).start();
         }
 
         boolean handled = toolRegistry.handle(toolName, toolUseId, content, output);
