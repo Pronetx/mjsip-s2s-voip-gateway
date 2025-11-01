@@ -1,0 +1,154 @@
+{
+  "deployment": {
+    "name": "mjsip-s2s-voip-gateway",
+    "description": "Nova Sonic VoIP Gateway deployment configuration",
+    "version": "0.6"
+  },
+  "aws": {
+    "region": "us-west-2",
+    "accountId": "322081704783"
+  },
+  "ec2": {
+    "instanceType": "t3.medium",
+    "ami": "Amazon Linux 2023",
+    "keyPairName": "mjsip_s2s_gateway",
+    "elasticIp": "35.155.30.129",
+    "elasticIpAllocationId": "eipalloc-014e35df18f325445",
+    "securityGroup": {
+      "name": "mjsip-s2s-gateway-sg",
+      "groupId": "sg-0bb11669bc8839de7",
+      "rules": [
+        {
+          "type": "ingress",
+          "protocol": "tcp",
+          "port": 22,
+          "source": "0.0.0.0/0",
+          "description": "SSH access"
+        },
+        {
+          "type": "ingress",
+          "protocol": "udp",
+          "port": 5060,
+          "source": "0.0.0.0/0",
+          "description": "SIP signaling"
+        },
+        {
+          "type": "ingress",
+          "protocol": "udp",
+          "portRange": "10000-20000",
+          "source": "0.0.0.0/0",
+          "description": "RTP media"
+        }
+      ]
+    },
+    "iamRole": {
+      "name": "NovaVoipGatewayRole",
+      "arn": "arn:aws:iam::322081704783:role/NovaVoipGatewayRole",
+      "instanceProfileName": "NovaVoipGatewayProfile",
+      "instanceProfileArn": "arn:aws:iam::322081704783:instance-profile/NovaVoipGatewayProfile",
+      "policies": [
+        {
+          "name": "NovaVoipGatewayPolicy",
+          "permissions": [
+            "bedrock:InvokeModel",
+            "bedrock:InvokeModelWithResponseStream",
+            "bedrock:GetModelInvocationLoggingConfiguration",
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents",
+            "logs:DescribeLogStreams",
+            "mobiletargeting:*",
+            "connect:*",
+            "lambda:InvokeFunction"
+          ]
+        }
+      ]
+    }
+  },
+  "sip": {
+    "mode": "trunk",
+    "registrationEnabled": false,
+    "server": "<sip_server_ip_or_hostname>",
+    "username": "<your_extension_or_trunk_identifier>",
+    "port": 5060,
+    "viaAddress": "35.155.30.129",
+    "description": "Trunk mode - no registration, inbound calls only"
+  },
+  "media": {
+    "rtpPortBase": 10000,
+    "rtpPortCount": 10000,
+    "codec": "PCMU",
+    "sampleRate": 8000
+  },
+  "aws_services": {
+    "pinpoint": {
+      "applicationId": "f87ebc6cb0924d51a0e0de7dfa5ddc3f",
+      "originationNumber": "+13682104244",
+      "description": "AWS Pinpoint for SMS/OTP functionality"
+    },
+    "lambda": {
+      "addressValidation": {
+        "url": "https://yo3qim52ngs3euzwkdxidl3isa0zomgt.lambda-url.us-west-2.on.aws/",
+        "description": "SmartyStreets address validation Lambda function"
+      },
+      "contactAttributeUpdate": {
+        "url": "<contact_attribute_lambda_url>",
+        "description": "Amazon Connect contact attribute update Lambda function (if applicable)"
+      }
+    },
+    "cloudwatch": {
+      "loggingEnabled": true,
+      "logGroup": "/aws/voip-gateway",
+      "region": "us-west-2"
+    },
+    "bedrock": {
+      "model": "amazon.nova-sonic",
+      "region": "us-west-2"
+    },
+    "connect": {
+      "instanceId": "<connect_instance_id>",
+      "phoneNumber": "+14432304260",
+      "description": "Amazon Connect integration (if applicable)"
+    }
+  },
+  "application": {
+    "jarFile": "s2s-voip-gateway-0.6-SNAPSHOT.jar",
+    "javaVersion": "17",
+    "workingDirectory": "/home/ec2-user/mjsip-s2s-voip-gateway",
+    "systemdService": "nova-voip-gateway",
+    "environment": {
+      "PINPOINT_APPLICATION_ID": "f87ebc6cb0924d51a0e0de7dfa5ddc3f",
+      "ADDRESS_VALIDATION_LAMBDA_URL": "https://yo3qim52ngs3euzwkdxidl3isa0zomgt.lambda-url.us-west-2.on.aws/",
+      "CLOUDWATCH_LOGGING_ENABLED": "true",
+      "AWS_REGION": "us-west-2",
+      "NOVA_VOICE_ID": "en_us_matthew"
+    }
+  },
+  "deployment_steps": [
+    "1. Create security group with SIP (5060 UDP) and RTP (10000-20000 UDP) ports",
+    "2. Create IAM role with Bedrock, Pinpoint, CloudWatch, Lambda, and Connect permissions",
+    "3. Launch EC2 instance (t3.medium, Amazon Linux 2023)",
+    "4. Associate elastic IP (35.155.30.129)",
+    "5. Attach IAM instance profile",
+    "6. Install Java 17 (amazon-corretto-headless)",
+    "7. Copy application JAR and .mjsip-ua config",
+    "8. Create systemd service with environment variables",
+    "9. Start and enable service",
+    "10. Verify SIP listening on port 5060"
+  ],
+  "verification": {
+    "commands": [
+      "sudo systemctl status nova-voip-gateway",
+      "sudo journalctl -u nova-voip-gateway -f",
+      "netstat -tuln | grep 5060"
+    ],
+    "testCall": "Call +14432304260 to test"
+  },
+  "notes": [
+    "SSH key location: /Users/yasser/Downloads/mjsip_s2s_gateway.pem",
+    "Deployment script: ./deploy-to-ec2.sh",
+    "Config template: .mjsip-ua-trunk.template",
+    "Environment template: environment.template",
+    "Repository: https://github.com/Pronetx/mjsip-s2s-voip-gateway"
+  ]
+}
