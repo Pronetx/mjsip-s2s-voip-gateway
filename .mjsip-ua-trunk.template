@@ -18,9 +18,9 @@ sip-user=<your_extension_or_trunk_identifier>
 registrar=<sip_server_ip_or_hostname>
 
 # Authentication credentials (required if your trunk requires auth)
-auth_user=<sip_username>
-auth_realm=<sip_realm>
-auth_passwd=<sip_password>
+#auth_user=<sip_username>
+#auth_realm=<sip_realm>
+#auth_passwd=<sip_password>
 
 # TRUNK MODE SETTINGS
 # Disable registration - gateway will only accept inbound calls
